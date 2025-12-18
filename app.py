@@ -7,6 +7,49 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import random
+
+# CẤU HÌNH EMAIL 
+SENDER_EMAIL = "thengudot1233@gmail.com"
+SENDER_PASSWORD = "qjxt jvxj ofjn horm" # Dán mật khẩu ứng dụng vào đây
+
+def send_verification_email(receiver_email):
+    # 1. Tạo mã xác thực ngẫu nhiên 6 số
+    verification_code = str(random.randint(100000, 999999))
+    
+    # 2. Nội dung email
+    subject = "Mã xác thực đăng ký EduManager"
+    body = f"""
+    <html>
+        <body>
+            <h2>Xin chào,</h2>
+            <p>Mã xác thực của bạn là: <strong style="color: #4361ee; font-size: 20px;">{verification_code}</strong></p>
+            <p>Vui lòng không chia sẻ mã này cho ai.</p>
+        </body>
+    </html>
+    """
+
+    # 3. Thiết lập gửi
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = receiver_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+
+    try:
+        # Kết nối tới server Gmail
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.sendmail(SENDER_EMAIL, receiver_email, msg.as_string())
+        server.quit()
+        return verification_code # Trả về mã để lưu vào database kiểm tra
+    except Exception as e:
+        print(f"Lỗi gửi email: {e}")
+        return None
 
 # =========================
 # 1. CẤU HÌNH DATABASE
@@ -16,13 +59,7 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-class Student(Base):
-    __tablename__ = "students"
-    id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(String, unique=True)
-    full_name = Column(String)
-    dob = Column(String)
-    status = Column(String)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -33,6 +70,7 @@ class User(Base):
     phone = Column(String) 
     role = Column(String, default="teacher")
     full_name = Column(String) # THÊM CỘT HỌ VÀ TÊN
+    verification_code = Column(String, nullable=True) # MÃ XÁC THỰC EMAIL
 
 class Classroom(Base):
     __tablename__ = "classrooms"
@@ -106,9 +144,10 @@ def require_staff(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="Chỉ Giáo viên hoặc Admin mới có quyền này.")
     return user
 
-# =========================
+
 # 3. ROUTE API
-# =========================
+
+# --- API ĐĂNG KÝ MỚI (GỬI MAIL) ---
 @app.post("/api/register")
 async def register(data: dict, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == data['username']).first():
@@ -116,29 +155,47 @@ async def register(data: dict, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data['email']).first():
         return {"status": "error", "message": "Email này đã được sử dụng"}
 
-    user_role = data.get('role', 'teacher') # Mặc định teacher như bạn yêu cầu
-    
-    # Kiểm tra mã GV
-    if user_role == 'teacher':
-        if data.get('teacher_code') != "EDU2025":
-            return {"status": "error", "message": "Sai mã xác thực Giáo viên"}
+    # Gửi mã xác thực
+    otp_code = send_verification_email(data['email'])
+    if not otp_code:
+        return {"status": "error", "message": "Lỗi gửi email xác thực. Kiểm tra lại email!"}
 
-    # LƯU HỌ VÀ TÊN VÀO DB
+    # Lưu user vào DB kèm mã OTP
     new_user = User(
         username=data['username'], 
         password=data['password'], 
         email=data['email'], 
         phone=data['phone'], 
-        role=user_role,
-        full_name=data.get('full_name', data['username']) # Nếu không nhập thì lấy tạm username
+        role=data['role'],
+        full_name=data.get('full_name', data['username']),
+        verification_code=otp_code # Lưu mã
     )
     db.add(new_user)
     db.commit()
-    return {"status": "success"}
+    
+    # Trả về username để chuyển sang trang nhập mã
+    return {"status": "success", "username": data['username']}
 
-# --- API QUÊN MẬT KHẨU (MỚI) ---
-# --- API QUÊN MẬT KHẨU (MỚI) ---
-# --- API QUÊN MẬT KHẨU (ĐÃ CẬP NHẬT TÊN) ---
+# --- API XÁC THỰC OTP (MỚI) ---
+@app.post("/api/verify-otp")
+async def verify_otp(data: dict, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == data['username']).first()
+    
+    if not user:
+        return {"status": "error", "message": "User không tồn tại"}
+    
+    if user.verification_code == data['otp']:
+        # Đúng mã -> Xóa mã đi (coi như đã kích hoạt)
+        user.verification_code = None 
+        db.commit()
+        return {"status": "success", "message": "Xác thực thành công!"}
+    else:
+        return {"status": "error", "message": "Mã xác thực không đúng!"}
+
+# --- Route trang Xác thực ---
+@app.get("/verify", response_class=HTMLResponse)
+async def verify_page(request: Request): return templates.TemplateResponse("verify.html", {"request": request})
+
 # --- API QUÊN MẬT KHẨU (BẢO MẬT HƠN) ---
 @app.post("/api/forgotpw")
 async def forgotpw(data: dict, db: Session = Depends(get_db)):
@@ -193,7 +250,7 @@ async def delete_room(data: dict, db: Session = Depends(get_db), current_user: U
         return {"status": "success", "message": "Đã xóa phòng!"}
     return {"status": "error", "message": "Không tìm thấy phòng!"}
 
-# --- API ĐẶT LỊCH (LƯU TÊN THẬT) ---
+# --- API ĐẶT LỊCH ---
 @app.post("/api/bookings/create")
 async def create_booking(data: dict, db: Session = Depends(get_db), current_user: User = Depends(require_staff)):
     room = db.query(Classroom).filter(Classroom.id == data['room_id']).first()
@@ -249,14 +306,45 @@ async def delete_user(data: dict, db: Session = Depends(get_db), current_user: U
     return {"status": "success", "message": "Đã xóa user!"}
 
 # --- API PROFILE CÁ NHÂN ---
+# --- API PROFILE CÁ NHÂN (NÂNG CẤP BẢO MẬT) ---
 @app.post("/api/profile/update")
 async def update_profile(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not current_user: return {"status": "error", "message": "Chưa đăng nhập!"}
-    current_user.email = data.get('email', current_user.email)
-    current_user.phone = data.get('phone', current_user.phone)
-    # Cho phép cập nhật cả tên hiển thị nếu muốn
-    # current_user.full_name = data.get('full_name', current_user.full_name) 
-    if data.get('password'): current_user.password = data['password']
+    
+    # 1. Kiểm tra xem có thay đổi thông tin nhạy cảm không
+    new_email = data.get('email')
+    new_phone = data.get('phone')
+    
+    is_sensitive_change = False
+    # Nếu gửi lên Email mới khác Email cũ -> Có thay đổi
+    if new_email and new_email != current_user.email: 
+        is_sensitive_change = True
+    # Nếu gửi lên SĐT mới khác SĐT cũ -> Có thay đổi
+    if new_phone and new_phone != current_user.phone: 
+        is_sensitive_change = True
+        
+    # 2. Nếu có thay đổi nhạy cảm -> Bắt buộc kiểm tra OTP
+    if is_sensitive_change:
+        otp_input = data.get('otp') # Lấy mã OTP gửi kèm
+        
+        if not otp_input:
+            # Báo cho Frontend biết là cần phải hỏi OTP
+            return {"status": "require_otp", "message": "Thay đổi Email/SĐT cần xác thực OTP"}
+        
+        # Kiểm tra mã OTP
+        if current_user.verification_code != otp_input:
+            return {"status": "error", "message": "Mã xác thực không đúng!"}
+        
+        # Nếu đúng -> Xóa mã OTP đi (để không dùng lại được)
+        current_user.verification_code = None
+
+    # 3. Tiến hành cập nhật
+    current_user.email = new_email
+    current_user.phone = new_phone
+    
+    # (Mật khẩu xử lý ở API riêng, nhưng nếu muốn giữ logic cũ thì để lại dòng này, tuy nhiên nên bỏ đi để bảo mật hơn)
+    # if data.get('password'): current_user.password = data['password'] 
+    
     db.commit()
     return {"status": "success", "message": "Cập nhật thông tin thành công!"}
 
@@ -373,6 +461,87 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
         "history": history,
         "full_name": u.full_name # TRUYỀN TÊN THẬT
     })
+
+# --- Route trang Xác thực (BẠN ĐANG THIẾU DÒNG NÀY) ---
+@app.get("/verify", response_class=HTMLResponse)
+async def verify_page(request: Request): return templates.TemplateResponse("verify.html", {"request": request})
+
+# --- 1. LOGIC GỬI MAIL (ĐÃ CÓ - GIỮ NGUYÊN) ---
+# ... (Đoạn code import smtplib và hàm send_verification_email giữ nguyên như cũ) ...
+
+# =========================================
+# API CHO CHỨC NĂNG QUÊN MẬT KHẨU (FORGOT PASSWORD)
+# =========================================
+
+# Bước 1: Gửi mã OTP để lấy lại mật khẩu
+@app.post("/api/forgot/send-otp")
+async def forgot_send_otp(data: dict, db: Session = Depends(get_db)):
+    # Tìm user theo tên đăng nhập
+    user = db.query(User).filter(User.username == data['username']).first()
+    if not user:
+        return {"status": "error", "message": "Tên đăng nhập không tồn tại!"}
+    
+    # Gửi mã về email đã đăng ký của user đó
+    otp = send_verification_email(user.email)
+    if not otp:
+        return {"status": "error", "message": "Lỗi hệ thống gửi mail. Vui lòng thử lại sau."}
+    
+    # Lưu mã vào DB
+    user.verification_code = otp
+    db.commit()
+    
+    # Trả về email (đã che bớt) để user biết mã gửi về đâu
+    hidden_email = user.email[:3] + "****" + user.email.split('@')[1]
+    return {"status": "success", "message": f"Mã xác thực đã gửi tới {hidden_email}"}
+
+# Bước 2: Xác nhận mã OTP và Đổi mật khẩu mới
+@app.post("/api/forgot/reset")
+async def forgot_reset_pass(data: dict, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == data['username']).first()
+    if not user: return {"status": "error", "message": "User không tồn tại"}
+
+    # Kiểm tra khớp mã OTP
+    if user.verification_code != data['otp']:
+        return {"status": "error", "message": "Mã xác thực không đúng!"}
+    
+    # Đổi mật khẩu
+    user.password = data['new_password']
+    user.verification_code = None # Xóa mã sau khi dùng
+    db.commit()
+    
+    return {"status": "success", "message": "Đổi mật khẩu thành công! Hãy đăng nhập."}
+
+
+# =========================================
+# API CHO CHỨC NĂNG ĐỔI MẬT KHẨU TRONG PROFILE
+# =========================================
+
+# Bước 1: Gửi mã OTP về email của người đang đăng nhập
+@app.post("/api/profile/send-otp")
+async def profile_send_otp(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user: return {"status": "error", "message": "Chưa đăng nhập!"}
+
+    otp = send_verification_email(user.email)
+    if not otp: return {"status": "error", "message": "Không thể gửi email."}
+
+    user.verification_code = otp
+    db.commit()
+    return {"status": "success", "message": "Đã gửi mã xác thực về Email của bạn."}
+
+# Bước 2: Xác nhận OTP và cập nhật mật khẩu mới
+@app.post("/api/profile/change-password")
+async def profile_change_pass(data: dict, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user: return {"status": "error", "message": "Chưa đăng nhập!"}
+
+    if user.verification_code != data['otp']:
+        return {"status": "error", "message": "Mã xác thực sai!"}
+    
+    user.password = data['new_password']
+    user.verification_code = None
+    db.commit()
+    return {"status": "success", "message": "Cập nhật mật khẩu thành công!"}
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)

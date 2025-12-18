@@ -36,15 +36,25 @@
 </head>
 <body>
     <div class="container">
-        <aside class="sidebar">
-            <div class="logo"><i class="fas fa-graduation-cap"></i><span>EduManager</span></div>
+       <aside class="sidebar">
+            <div class="logo" style="color: var(--color-bar);"><i class="fas fa-graduation-cap"></i><span>EduManager</span></div>
             <nav>
                 <ul>
                     <li><a href="/dashboard"><i class="fas fa-th-large"></i> Tổng quan</a></li>
+                    
                     <li><a href="/booking-scheduler"><i class="fas fa-calendar-alt"></i> Lịch đặt phòng</a></li>
+                    
                     <li><a href="/room-management"><i class="fas fa-door-open"></i> Quản lý phòng học</a></li>
-                     <li><a href="/profile"><i class="fas fa-user-shield"></i> Quản lý người dùng</a></li>
-                    <li class="logout-item"><a href="/logout" style="color: #ef233c;">Đăng xuất</a></li>
+                    
+                    {% if role == 'admin' %}
+                    <li class="active"><a href="/user-management"><i class="fas fa-users-cog"></i> Quản lý người dùng</a></li>
+                    {% endif %}
+                    
+                    <li><a href="/profile"><i class="fas fa-user-circle"></i> Quản lý tài khoản</a></li>
+                    
+                    <li class="logout-item" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px;">
+                        <a href="/logout" style="color: #ef233c !important;"><i class="fas fa-sign-out-alt"></i> Đăng xuất</a>
+                    </li>
                 </ul>
             </nav>
         </aside>

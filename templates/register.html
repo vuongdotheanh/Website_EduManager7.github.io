@@ -102,12 +102,19 @@
                 const data = await res.json();
                 
                 if(data.status === "success") {
+                    // CŨ: Chuyển về trang đăng nhập luôn
+                    // window.location.href = "/"; 
+                    
+                    // MỚI: Chuyển sang trang nhập mã OTP
                     Swal.fire({
-                        title: 'Thành công!',
-                        text: 'Tài khoản Giáo viên đã tạo xong. Hãy đăng nhập ngay.',
-                        icon: 'success',
-                        confirmButtonText: 'Đăng nhập'
-                    }).then(() => { window.location.href = "/"; });
+                        title: 'Đã gửi mã!',
+                        text: 'Vui lòng kiểm tra Email để lấy mã xác thực.',
+                        icon: 'info',
+                        confirmButtonText: 'Nhập mã ngay'
+                    }).then(() => { 
+                        // Chuyển hướng kèm theo tên đăng nhập
+                        window.location.href = "/verify?user=" + u; 
+                    });
                 } else {
                     Swal.fire('Đăng ký thất bại', data.message, 'error');
                 }
