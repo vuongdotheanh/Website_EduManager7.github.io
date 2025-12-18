@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản lý tài khoản - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .profile-wrapper { display: flex; gap: 30px; flex-wrap: wrap; }
+        
+        /* Cột bên trái: Form sửa thông tin */
+        .profile-card { flex: 1; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); min-width: 300px; height: fit-content; }
+        
+        /* Cột bên phải: Lịch sử */
+        .history-card { flex: 1.5; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); min-width: 300px; }
+
+        h2 { margin-top: 0; color: #4361ee; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 20px; font-size: 1.2rem; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #2b2d42; font-size: 0.9rem; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #f0f0f0; border-radius: 10px; font-size: 14px; box-sizing: border-box; transition: 0.3s; }
+        .form-group input:focus { border-color: #4361ee; outline: none; }
+        .form-group input:disabled { background: #f9f9f9; color: #888; border-color: #eee; }
+        
+        .role-tag { display: inline-block; background: #e0e7ff; color: #4361ee; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; text-transform: uppercase; }
+        
+        .btn-save { width: 100%; padding: 12px; background: #4361ee; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3); margin-top: 10px; }
+        .btn-save:hover { background: #3a0ca3; transform: translateY(-2px); }
+
+        /* Bảng lịch sử */
+        .history-table { width: 100%; border-collapse: collapse; }
+        .history-table th { text-align: left; color: #888; font-size: 0.85rem; padding: 10px; border-bottom: 1px solid #eee; }
+        .history-table td { padding: 15px 10px; border-bottom: 1px solid #f9f9f9; font-size: 0.95rem; }
+        .history-icon { width: 30px; height: 30px; background: #e6fffa; color: #06d6a0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; }
+        
+        .empty-history { text-align: center; color: #999; padding: 40px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo"><i class="fas fa-graduation-cap"></i><span>EduManager</span></div>
+            <nav>
+                <ul>
+                    <li><a href="/dashboard"><i class="fas fa-th-large"></i> Tổng quan</a></li>
+                    {% if role == 'admin' or role == 'teacher' %}
+                    <li><a href="/booking-scheduler"><i class="fas fa-calendar-alt"></i> Lịch đặt phòng</a></li>
+                    <li><a href="/room-management"><i class="fas fa-door-open"></i> Quản lý phòng học</a></li>
+                    {% endif %}
+                    {% if role == 'admin' %}
+                    <li><a href="/user-management"><i class="fas fa-user-shield"></i> Quản lý người dùng</a></li>
+                    {% endif %}
+                    <li><a href="/profile" class="active" style="background: rgba(67, 97, 238, 0.1); color: #4361ee; font-weight: 700;"><i class="fas fa-user-circle"></i> Quản lý tài khoản</a></li>
+                    <li class="logout-item"><a href="/logout" style="color: #ef233c;"><i class="fas fa-sign-out-alt"></i> Đăng xuất</a></li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header>
+                <div class="search-bar" style="visibility: hidden;"><i class="fas fa-search"></i><input type="text"></div>
+                <div class="user-profile"><div class="info"><strong>{{ username }}</strong> ({{ role }})</div></div>
+            </header>
+
+            <div class="profile-wrapper">
+                <div class="profile-card">
+                    <h2><i class="fas fa-id-card"></i> Thông tin cá nhân</h2>
+                    <form id="profileForm">
+                        <div class="form-group">
+                            <label>Tên đăng nhập <span class="role-tag">{{ role }}</span></label>
+                            <input type="text" value="{{ user.username }}" disabled>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-envelope"></i> Email</label>
+                            <input type="email" name="email" value="{{ user.email if user.email != 'None' else '' }}" required placeholder="Nhập email của bạn...">
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-phone"></i> Số điện thoại</label>
+                            <input type="text" name="phone" value="{{ user.phone if user.phone != 'None' else '' }}" placeholder="Nhập số điện thoại...">
+                        </div>
+
+                        <div class="form-group" style="margin-top: 25px;">
+                            <label style="color: #ef233c;"><i class="fas fa-key"></i> Đổi mật khẩu mới</label>
+                            <input type="password" name="password" placeholder="Chỉ nhập nếu muốn đổi mật khẩu...">
+                        </div>
+
+                        <button type="submit" class="btn-save">Cập nhật thông tin</button>
+                    </form>
+                </div>
+
+                <div class="history-card">
+                    <h2><i class="fas fa-history"></i> Lịch sử đặt phòng</h2>
+                    
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Phòng</th>
+                                <th>Thời gian bắt đầu</th>
+                                <th>Thời lượng</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in history %}
+                            <tr>
+                                <td>
+                                    <div style="display: flex; align-items: center;">
+                                        <div class="history-icon"><i class="fas fa-door-open"></i></div>
+                                        <strong>{{ item.room_name }}</strong>
+                                    </div>
+                                </td>
+                                <td>{{ item.start_time.split('T')[0] }} <span style="color:#888; font-size:0.8rem;">{{ item.start_time.split('T')[1][:5] }}</span></td>
+                                <td>{{ item.duration }}</td>
+                                <td><span style="color: #06d6a0; font-weight: bold; font-size: 0.85rem;">{{ item.status }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4">
+                                    <div class="empty-history">
+                                        <i class="fas fa-box-open" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                                        <p>Bạn chưa có lịch đặt phòng nào.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.getElementById('profileForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target).entries());
+            
+            const res = await fetch('/api/profile/update', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            
+            if (result.status === 'success') {
+                Swal.fire({ title: 'Thành công!', text: result.message, icon: 'success', confirmButtonColor: '#4361ee' }).then(() => window.location.reload());
+            } else {
+                Swal.fire('Lỗi!', result.message, 'error');
+            }
+        };
+    </script>
+</body>
+</html>

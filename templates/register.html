@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng ký tài khoản - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body.login-page {
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9effd 100%);
+        }
+    </style>
+</head>
+<body class="login-page">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="logo"><i class="fas fa-user-plus"></i><span>EduManager</span></div>
+            <h2>Đăng Ký Giáo Viên</h2>
+            <p>Dành cho cán bộ giảng dạy</p>
+        </div>
+        
+        <div class="login-form">
+            <div class="form-group">
+                <label><i class="fas fa-id-card"></i> Họ và tên</label>
+                <input type="text" id="reg-fullname" placeholder="Nhập họ tên đầy đủ (VD: Nguyễn Văn A)" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> Tên đăng nhập</label>
+                <input type="text" id="reg-user" placeholder="Ví dụ: giaovien01">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Email</label>
+                <input type="email" id="reg-email" placeholder="email@truong.edu.vn">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-phone"></i> Số điện thoại</label>
+                <input type="text" id="reg-phone" placeholder="09xxxxxxx">
+            </div>
+
+            <input type="hidden" id="reg-role" value="teacher">
+
+            <div class="form-group">
+                <label style="color: #4361ee;"><i class="fas fa-key"></i> Mã xác thực Nhà trường</label>
+                <input type="password" id="reg-teacher-code" placeholder="Nhập mã bí mật (Gợi ý: EDU2025)">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-key"></i> Mật khẩu</label>
+                <input type="password" id="reg-pass" placeholder="Nhập mật khẩu">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-check-double"></i> Xác nhận mật khẩu</label>
+                <input type="password" id="reg-confirm" placeholder="Nhập lại mật khẩu">
+            </div>
+
+            <button onclick="handleRegister()" class="btn-login">Đăng Ký Ngay</button>
+        </div>
+
+        <div class="login-footer">
+            <p>Đã có tài khoản? <a href="/">Đăng nhập</a></p>
+        </div>
+    </div>
+
+    <script>
+        async function handleRegister() {
+            const fullname = document.getElementById('reg-fullname').value; // Lấy họ tên
+            const u = document.getElementById('reg-user').value;
+            const e = document.getElementById('reg-email').value;
+            const ph = document.getElementById('reg-phone').value;
+            const p = document.getElementById('reg-pass').value;
+            const c = document.getElementById('reg-confirm').value;
+            const teacherCode = document.getElementById('reg-teacher-code').value;
+
+            if(!fullname || !u || !e || !ph || !p || !teacherCode) {
+                Swal.fire('Thiếu thông tin', 'Vui lòng nhập đầy đủ các trường!', 'warning');
+                return;
+            }
+
+            if(p !== c) {
+                Swal.fire('Lỗi mật khẩu', 'Mật khẩu xác nhận không khớp!', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        full_name: fullname, // Gửi họ tên lên server
+                        username: u, password: p, email: e, phone: ph, 
+                        role: 'teacher', 
+                        teacher_code: teacherCode
+                    })
+                });
+
+                const data = await res.json();
+                
+                if(data.status === "success") {
+                    Swal.fire({
+                        title: 'Thành công!',
+                        text: 'Tài khoản Giáo viên đã tạo xong. Hãy đăng nhập ngay.',
+                        icon: 'success',
+                        confirmButtonText: 'Đăng nhập'
+                    }).then(() => { window.location.href = "/"; });
+                } else {
+                    Swal.fire('Đăng ký thất bại', data.message, 'error');
+                }
+            } catch (err) {
+                Swal.fire('Lỗi kết nối', 'Không thể kết nối đến server.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
