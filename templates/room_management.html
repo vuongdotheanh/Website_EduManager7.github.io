@@ -59,7 +59,7 @@
         
         <main class="main-content">
             <header>
-                <div class="search-bar"><i class="fas fa-search"></i><input type="text" placeholder="Tìm kiếm..."></div>
+                <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="searchInput" onkeyup="searchRooms()" placeholder="Tìm theo tên phòng, thiết bị..."></div>
                 <div class="user-profile">
                     <div class="info"><strong>{{ full_name if full_name else username }}</strong> ({{ role }})</div>
                     
@@ -185,19 +185,28 @@
         }
 
         // === HÀM TÌM KIẾM (Đã tích hợp cùng bộ lọc) ===
+        // === HÀM TÌM KIẾM NÂNG CẤP (Tên phòng + Thiết bị) ===
         function searchRooms() {
             var input = document.getElementById("searchInput");
             var filter = input.value.toUpperCase();
             var rows = document.querySelectorAll('.room-row');
             
-            // Ẩn chi tiết khi search
+            // Ẩn các dòng chi tiết đang mở để tránh rối mắt khi tìm kiếm
             document.querySelectorAll('.room-details-row').forEach(d => d.style.display = 'none');
+            document.querySelectorAll('.actions button').forEach(b => b.innerText = 'Chi tiết');
 
             rows.forEach(row => {
-                var td = row.getElementsByTagName("td")[1]; // Cột Tên phòng
-                if (td) {
-                    var txtValue = td.textContent || td.innerText;
-                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                // Lấy cột Tên phòng (vị trí index 1)
+                var nameCol = row.getElementsByTagName("td")[1];
+                // Lấy cột Thiết bị (vị trí index 3)
+                var equipCol = row.getElementsByTagName("td")[3];
+
+                if (nameCol && equipCol) {
+                    var nameTxt = nameCol.textContent || nameCol.innerText;
+                    var equipTxt = equipCol.textContent || equipCol.innerText;
+
+                    // Kiểm tra nếu Tên phòng HOẶC Thiết bị chứa từ khóa tìm kiếm
+                    if (nameTxt.toUpperCase().indexOf(filter) > -1 || equipTxt.toUpperCase().indexOf(filter) > -1) {
                         row.style.display = "";
                     } else {
                         row.style.display = "none";

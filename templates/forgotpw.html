@@ -4,24 +4,43 @@
     <meta charset="UTF-8">
     <title>Quên mật khẩu - EduManager</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body.login-page {
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9effd 100%);
+        }
+    </style>
 </head>
 <body class="login-page">
     <div class="login-card">
         <div class="login-header">
-            <h2>Đặt Lại Mật Khẩu</h2>
-            <p>Nhập tên đăng nhập để thay đổi mật khẩu</p>
+            <div class="logo" style="justify-content: center; margin-bottom: 10px;">
+                <i class="fas fa-key"></i> <span>EduManager</span>
+            </div>
+            <h2>Khôi Phục Mật Khẩu</h2>
+            <p>Nhập thông tin xác minh để tạo mật khẩu mới</p>
         </div>
+        
         <div class="login-form">
             <div class="form-group">
                 <label>Tên đăng nhập</label>
-                <input type="text" id="reset-user" placeholder="Nhập tên đăng nhập của bạn">
+                <input type="text" id="reset-user" placeholder="Nhập tên đăng nhập...">
             </div>
+
+            <div class="form-group">
+                <label>Số điện thoại xác minh</label>
+                <input type="text" id="reset-phone" placeholder="Nhập SĐT đã đăng ký...">
+            </div>
+
             <div class="form-group">
                 <label>Mật khẩu mới</label>
-                <input type="password" id="new-pass" placeholder="••••••••">
+                <input type="password" id="new-pass" placeholder="Nhập mật khẩu mới...">
             </div>
+
             <button onclick="handleReset()" class="btn-login">Cập Nhật Mật Khẩu</button>
         </div>
+        
         <div class="login-footer">
             <p><a href="/">Quay lại Đăng nhập</a></p>
         </div>
@@ -30,16 +49,43 @@
     <script>
         async function handleReset() {
             const u = document.getElementById('reset-user').value;
+            const ph = document.getElementById('reset-phone').value; // Lấy SĐT
             const np = document.getElementById('new-pass').value;
 
-            const res = await fetch('/api/reset-password', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: u, new_password: np})
-            });
-            const data = await res.json();
-            alert(data.message);
-            if(data.status === "success") window.location.href = "/";
+            if (!u || !ph || !np) {
+                Swal.fire('Thiếu thông tin', 'Vui lòng nhập đầy đủ Tên đăng nhập, SĐT và Mật khẩu mới!', 'warning');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/forgotpw', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: u, 
+                        phone: ph,        // Gửi kèm SĐT
+                        new_password: np
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if(data.status === "success") {
+                    Swal.fire({
+                        title: 'Thành công!',
+                        text: data.message,
+                        icon: 'success',
+                        confirmButtonText: 'Đăng nhập ngay',
+                        confirmButtonColor: '#4361ee'
+                    }).then(() => {
+                        window.location.href = "/";
+                    });
+                } else {
+                    Swal.fire('Thất bại', data.message, 'error');
+                }
+            } catch (err) {
+                Swal.fire('Lỗi kết nối', 'Không thể kết nối đến máy chủ.', 'error');
+            }
         }
     </script>
 </body>

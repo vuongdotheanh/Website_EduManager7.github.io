@@ -136,6 +136,27 @@ async def register(data: dict, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success"}
 
+# --- API QUÊN MẬT KHẨU (MỚI) ---
+# --- API QUÊN MẬT KHẨU (MỚI) ---
+# --- API QUÊN MẬT KHẨU (ĐÃ CẬP NHẬT TÊN) ---
+# --- API QUÊN MẬT KHẨU (BẢO MẬT HƠN) ---
+@app.post("/api/forgotpw")
+async def forgotpw(data: dict, db: Session = Depends(get_db)):
+    # Tìm user khớp cả Tên đăng nhập VÀ Số điện thoại
+    user = db.query(User).filter(
+        User.username == data['username'], 
+        User.phone == data['phone']
+    ).first()
+    
+    if not user:
+        # Nếu không khớp cả 2 thông tin thì báo lỗi chung để bảo mật
+        return {"status": "error", "message": "Thông tin không chính xác (Sai tên đăng nhập hoặc số điện thoại)!"}
+    
+    # Nếu đúng thông tin -> Cập nhật mật khẩu mới
+    user.password = data['new_password']
+    db.commit()
+    
+    return {"status": "success", "message": "Đã đặt lại mật khẩu thành công! Hãy đăng nhập."}
 @app.post("/api/login")
 async def login(data: dict, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == data['username'], User.password == data['password']).first()
@@ -249,8 +270,7 @@ async def root(request: Request): return templates.TemplateResponse("login.html"
 async def reg(request: Request): return templates.TemplateResponse("register.html", {"request": request})
 
 @app.get("/forgot-password", response_class=HTMLResponse)
-async def forgot(request: Request): return templates.TemplateResponse("forgot_password.html", {"request": request})
-
+async def forgot(request: Request): return templates.TemplateResponse("forgotpw.html", {"request": request})
 @app.get("/logout")
 async def logout(response: Response): response = RedirectResponse("/"); response.delete_cookie("current_user"); return response
 

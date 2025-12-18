@@ -73,7 +73,7 @@
         
         <main class="main-content">
             <header>
-                <div class="search-bar"><i class="fas fa-search"></i><input type="text" placeholder="Tìm kiếm..."></div>
+                <div style="visibility: hidden;"></div>
                 <div class="user-profile">
                     <div class="info"><strong>{{ full_name if full_name else username }}</strong> ({{ role }})</div>
                     
@@ -280,54 +280,83 @@
         }
 
         function setupDragDrop() {
-            let isDragging = false, startCell = null, selectionDiv = null;
+            let isDragging = false;
+            let startCell = null;
+            let selectionDiv = null;
             const container = document.querySelector('.scheduler-container');
 
+            // 1. SỰ KIỆN NHẤN CHUỘT (BẮT ĐẦU KÉO)
             container.onmousedown = (e) => {
-                // CHỈ CHO PHÉP KÉO TRÊN Ô AVAILABLE (Ô BẢO TRÌ SẼ BỊ BỎ QUA)
-                if(e.target.classList.contains('available-slot')) {
-                    isDragging = true; startCell = e.target;
+                if (e.target.classList.contains('available-slot')) {
+                    isDragging = true;
+                    startCell = e.target;
+
+                    // Tạo khung hiển thị vùng chọn
                     selectionDiv = document.createElement('div');
                     selectionDiv.className = 'drag-selection';
+                    // QUAN TRỌNG: Cho phép chuột "xuyên qua" khung này để không bị cản trở
+                    selectionDiv.style.pointerEvents = 'none'; 
                     document.body.appendChild(selectionDiv);
+
                     updateSelection(startCell, startCell);
-                    e.preventDefault();
+                    e.preventDefault(); // Ngăn không cho bôi đen văn bản
                 }
             };
 
+            // 2. SỰ KIỆN DI CHUỘT (ĐÃ TỐI ƯU HÓA)
             document.onmousemove = (e) => {
-                if(!isDragging || !startCell) return;
-                selectionDiv.style.display = 'none';
+                if (!isDragging || !startCell) return;
+
+                // Vì đã có pointer-events: none, ta không cần ẩn hiện div nữa
+                // elementFromPoint sẽ tự động nhìn xuyên qua khung chọn
                 let elem = document.elementFromPoint(e.clientX, e.clientY);
-                selectionDiv.style.display = 'block';
-                if(elem && elem.classList.contains('available-slot') && elem.dataset.roomId === startCell.dataset.roomId) {
+
+                // Chỉ cập nhật nếu chuột vẫn nằm trên ô trống và CÙNG HÀNG với ô bắt đầu
+                if (elem && elem.classList.contains('available-slot') && elem.dataset.roomId === startCell.dataset.roomId) {
                     updateSelection(startCell, elem);
                 }
             };
 
-            document.onmouseup = (e) => {
-                if(!isDragging) return;
-                isDragging = false;
-                selectionDiv.style.display = 'none';
+            // 3. SỰ KIỆN THẢ CHUỘT (SỬA LỖI KẸT)
+            // Dùng window.onmouseup để bắt sự kiện dù thả chuột ở bất cứ đâu
+            window.onmouseup = (e) => {
+                if (!isDragging) return; // Nếu không đang kéo thì bỏ qua
+                
+                isDragging = false; // Reset trạng thái ngay lập tức
+
+                // Kiểm tra xem vị trí thả chuột có hợp lệ không
                 let endCell = document.elementFromPoint(e.clientX, e.clientY);
-                if(endCell && endCell.classList.contains('available-slot') && endCell.dataset.roomId === startCell.dataset.roomId) {
+
+                if (endCell && endCell.classList.contains('available-slot') && startCell && endCell.dataset.roomId === startCell.dataset.roomId) {
                     openBookingModal(startCell, endCell);
                 }
-                if(selectionDiv) selectionDiv.remove(); startCell = null;
+
+                // Dọn dẹp khung chọn
+                if (selectionDiv) {
+                    selectionDiv.remove();
+                    selectionDiv = null;
+                }
+                startCell = null;
             };
 
+            // Hàm vẽ khung chọn
             function updateSelection(c1, c2) {
                 let r1 = c1.getBoundingClientRect();
                 let r2 = c2.getBoundingClientRect();
+
+                // Tính toán tọa độ bao quanh cả 2 ô
                 let left = Math.min(r1.left, r2.left);
+                let top = r1.top; // Top giống nhau vì cùng hàng
                 let width = Math.abs(r1.left - r2.left) + r1.width;
+                let height = r1.height;
+
+                // Cập nhật vị trí (cộng thêm scrollX/Y để đúng vị trí trên trang)
                 selectionDiv.style.left = (left + window.scrollX) + 'px';
-                selectionDiv.style.top = (r1.top + window.scrollY) + 'px';
+                selectionDiv.style.top = (top + window.scrollY) + 'px';
                 selectionDiv.style.width = width + 'px';
-                selectionDiv.style.height = r1.height + 'px';
+                selectionDiv.style.height = height + 'px';
             }
         }
-
         function openBookingModal(c1, c2) {
             let t1 = new Date(c1.dataset.time);
             let t2 = new Date(c2.dataset.time);
