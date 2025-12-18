@@ -1,3 +1,6 @@
 fastapi
 uvicorn
-gunicorn
+sqlalchemy
+jinja2
+python-multipart
+requests
